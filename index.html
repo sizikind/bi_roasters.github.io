@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прожарка BI-отчетов 🔥</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --accent-color: #ff5e00;
+            --accent-hover: #ff7c30;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 94, 0, 0.3);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        #report-name {
+            font-size: 1.8rem;
+            font-weight: bold;
+            line-height: 1.4;
+            color: #fff;
+            word-break: break-word;
+        }
+
+        .placeholder {
+            color: var(--text-muted) !important;
+            font-weight: normal !important;
+            font-style: italic;
+            font-size: 1.2rem !important;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(255, 94, 0, 0.2);
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+            transform: scale(1.02);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .error-message {
+            color: #ff4a4a;
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Прожарка Отчетов 🔥</h1>
+        <p class="subtitle">Случайный выбор кандидата для детального разбора и фидбека</p>
+
+        <div class="card">
+            <div id="report-name" class="placeholder">Нажмите кнопку, чтобы выбрать отчет...</div>
+        </div>
+
+        <button id="spin-btn" onclick="getRandomReport()">ВЫБРАТЬ ОТЧЕТ</button>
+        <div id="error-log" class="error-message"></div>
+    </div>
+
+    <script>
+        // Ссылка на экспорт вашей Google Таблицы в формате CSV
+        // ВАЖНО: Замените ЭТУ ссылку на свою (инструкция ниже)
+        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT84DafA4Dnj1s9HXCLpgEkV774xpA3shHecKDRPbJXoZPuJ2xBLmL8632rDysb99TsrwOiMefUbmJg/pub?gid=1285220382&single=true&output=csv';
+
+        let reports = [];
+
+        // Загружаем отчеты из таблицы при запуске страницы
+        async function loadReports() {
+            const errorLog = document.getElementById('error-log');
+            try {
+                const response = await fetch(SHEET_CSV_URL);
+                if (!response.ok) throw new Error('Не удалось загрузить данные из таблицы');
+                
+                const csvText = await response.text();
+                
+                // Простейший парсинг CSV (разбивка по строкам)
+                reports = csvText
+                    .split(/\r?\n/)
+                    .map(row => row.trim())
+                    .filter(row => row.length > 0); // Убираем пустые строки
+
+                // Если в таблице есть шапка (например, "Название отчета"), убираем её:
+                if (reports.length > 0 && reports[0].toLowerCase().includes('назван')) {
+                    reports.shift();
+                }
+
+                if (reports.length === 0) {
+                    throw new Error('Таблица пуста');
+                }
+            } catch (error) {
+                console.error(error);
+                errorLog.textContent = 'Ошибка загрузки списка отчетов. Проверьте публикацию таблицы.';
+            }
+        }
+
+        // Функция выбора случайного отчета с эффектом «прокрутки»
+        function getRandomReport() {
+            if (reports.length === 0) {
+                document.getElementById('report-name').textContent = 'Список отчетов пуст или еще загружается...';
+                return;
+            }
+
+            const reportDisplay = document.getElementById('report-name');
+            const btn = document.getElementById('spin-btn');
+            
+            reportDisplay.classList.remove('placeholder');
+            btn.disabled = true;
+
+            // Эффект быстрой смены названий перед финальным выбором (рулетка)
+            let iterations = 0;
+            const interval = setInterval(() => {
+                const tempIndex = Math.floor(Math.random() * reports.length);
+                reportDisplay.textContent = reports[tempIndex];
+                iterations++;
+
+                if (iterations > 8) {
+                    clearInterval(interval);
+                    // Финальный выбор
+                    const finalIndex = Math.floor(Math.random() * reports.length);
+                    reportDisplay.textContent = reports[finalIndex];
+                    btn.disabled = false;
+                }
+            }, 100);
+        }
+
+        // Инициализация при загрузке страницы
+        loadReports();
+    </script>
+</body>
+</html>

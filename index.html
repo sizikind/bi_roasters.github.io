@@ -60,11 +60,11 @@
             justify-content: center;
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             transition: transform 0.2s, border-color 0.2s;
+            overflow: hidden;
         }
 
         .card:hover {
             border-color: var(--accent-color);
-            transform: translateY(-2px);
         }
 
         #report-name {
@@ -73,6 +73,7 @@
             line-height: 1.4;
             color: #fff;
             word-break: break-word;
+            transition: transform 0.1s ease-out, color 0.3s ease, text-shadow 0.3s ease;
         }
 
         .placeholder {
@@ -95,13 +96,20 @@
             box-shadow: 0 4px 12px rgba(255, 94, 0, 0.2);
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background-color: var(--accent-hover);
             transform: scale(1.02);
         }
 
-        button:active {
+        button:active:not(:disabled) {
             transform: scale(0.98);
+        }
+
+        button:disabled {
+            background-color: #30363d;
+            color: #8b949e;
+            cursor: not-allowed;
+            box-shadow: none;
         }
 
         .error-message {
@@ -115,7 +123,7 @@
 
     <div class="container">
         <h1>Прожарка Отчетов 🔥</h1>
-        <p class="subtitle">Случайный выбор кандидата для детального разбора и фидбека</p>
+        <p class="subtitle">Случайный выбор жертвы для деструктивного фидбека</p>
 
         <div class="card">
             <div id="report-name" class="placeholder">Нажмите кнопку, чтобы выбрать отчет...</div>
@@ -126,29 +134,31 @@
     </div>
 
     <script>
-        // Ссылка на экспорт вашей Google Таблицы в формате CSV
-        // ВАЖНО: Замените ЭТУ ссылку на свою (инструкция ниже)
+        // Ваша ссылка на Google Таблицу в формате CSV
         const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT84DafA4Dnj1s9HXCLpgEkV774xpA3shHecKDRPbJXoZPuJ2xBLmL8632rDysb99TsrwOiMefUbmJg/pub?gid=1285220382&single=true&output=csv';
 
         let reports = [];
 
-        // Загружаем отчеты из таблицы при запуске страницы
         async function loadReports() {
             const errorLog = document.getElementById('error-log');
             try {
                 const response = await fetch(SHEET_CSV_URL);
-                if (!response.ok) throw new Error('Не удалось загрузить данные из таблицы');
+                if (!response.ok) throw new Error('Не удалось загрузить данные');
                 
                 const csvText = await response.text();
                 
-                // Простейший парсинг CSV (разбивка по строкам)
+                // Парсим строки CSV
                 reports = csvText
                     .split(/\r?\n/)
-                    .map(row => row.trim())
-                    .filter(row => row.length > 0); // Убираем пустые строки
+                    .map(row => {
+                        // Очищаем от возможных кавычек, которые добавляет CSV для строк с запятыми
+                        return row.replace(/^"|"$/g, '').trim();
+                    })
+                    .filter(row => row.length > 0);
 
-                // Если в таблице есть шапка (например, "Название отчета"), убираем её:
-                if (reports.length > 0 && reports[0].toLowerCase().includes('назван')) {
+                // Если первая строчка — это заголовок таблицы, убираем её из рандомайзера
+                const firstRowLower = reports[0]?.toLowerCase() || '';
+                if (reports.length > 0 && (firstRowLower.includes('назван') || firstRowLower.includes('report') || firstRowLower.includes('отчет'))) {
                     reports.shift();
                 }
 
@@ -161,37 +171,59 @@
             }
         }
 
-        // Функция выбора случайного отчета с эффектом «прокрутки»
+        let isSpinning = false;
+
         function getRandomReport() {
-            if (reports.length === 0) {
-                document.getElementById('report-name').textContent = 'Список отчетов пуст или еще загружается...';
-                return;
-            }
+            if (reports.length === 0 || isSpinning) return;
 
             const reportDisplay = document.getElementById('report-name');
             const btn = document.getElementById('spin-btn');
             
-            reportDisplay.classList.remove('placeholder');
+            isSpinning = true;
             btn.disabled = true;
+            reportDisplay.classList.remove('placeholder');
 
-            // Эффект быстрой смены названий перед финальным выбором (рулетка)
-            let iterations = 0;
-            const interval = setInterval(() => {
-                const tempIndex = Math.floor(Math.random() * reports.length);
-                reportDisplay.textContent = reports[tempIndex];
-                iterations++;
+            // Сброс визуальных эффектов с прошлого круга
+            reportDisplay.style.color = '#fff';
+            reportDisplay.style.textShadow = 'none';
+            reportDisplay.style.transform = 'scale(1)';
 
-                if (iterations > 8) {
-                    clearInterval(interval);
-                    // Финальный выбор
-                    const finalIndex = Math.floor(Math.random() * reports.length);
-                    reportDisplay.textContent = reports[finalIndex];
+            let currentDelay = 35;  // Начальная скорость перелистывания (очень быстрая)
+            const maxDelay = 600;   // Скорость полной остановки
+            const deceleration = 1.15; // Постепенное замедление
+            let lastIndex = -1;
+
+            function tick() {
+                let randomIndex;
+                // Исключаем повторение одного и того же отчета два раза подряд во время прокрутки
+                do {
+                    randomIndex = Math.floor(Math.random() * reports.length);
+                } while (reports.length > 1 && randomIndex === lastIndex);
+                
+                lastIndex = randomIndex;
+                reportDisplay.textContent = reports[randomIndex];
+
+                // Легкая визуальная вибрация текста при быстром вращении барабана
+                reportDisplay.style.transform = `scale(${1 + Math.random() * 0.04})`;
+
+                if (currentDelay < maxDelay) {
+                    currentDelay *= deceleration;
+                    setTimeout(tick, currentDelay);
+                } else {
+                    // Конец прокрутки
+                    isSpinning = false;
                     btn.disabled = false;
+
+                    // Огненное выделение финального выбора
+                    reportDisplay.style.color = 'var(--accent-color)';
+                    reportDisplay.style.textShadow = '0 0 25px rgba(255, 94, 0, 0.8), 0 0 10px rgba(255, 94, 0, 0.5)';
+                    reportDisplay.style.transform = 'scale(1.15)';
                 }
-            }, 100);
+            }
+
+            tick();
         }
 
-        // Инициализация при загрузке страницы
         loadReports();
     </script>
 </body>
